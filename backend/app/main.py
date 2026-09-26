@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.database import check_db_connection
+from app.api import auth, tickets
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -41,3 +42,6 @@ def health_check():
         "environment": settings.ENVIRONMENT,
         "database": "connected" if db_status else "disconnected"
     }
+## Include Routers
+app.include_router(auth.router)
+app.include_router(tickets.router)
