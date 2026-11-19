@@ -142,6 +142,36 @@ def get_ticket(
 
     return ticket
 
+@router.get("/{ticket_id}/history")
+def get_ticket_history(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    if current_user.role == UserRole.STUDENT and ticket.reported_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    rows = (
+        db.query(TicketHistory)
+        .filter(TicketHistory.ticket_id == ticket_id)
+        .order_by(TicketHistory.timestamp)
+        .all()
+    )
+    return [
+        {
+            "id": h.id,
+            "old_status": h.old_status.value if h.old_status else None,
+            "new_status": h.new_status.value,
+            "comment": h.comment,
+            "timestamp": h.timestamp,
+        }
+        for h in rows
+    ]
+
 
 # ─── UPDATE ───────────────────────────────────────
 @router.patch("/{ticket_id}", response_model=TicketResponse)
