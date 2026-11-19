@@ -5,10 +5,6 @@ from app.db.database import check_db_connection
 from app.api import auth, tickets
 from app.api import auth, tickets, locations
 
-app.include_router(auth.router)
-app.include_router(tickets.router)
-app.include_router(locations.router)
-
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -29,6 +25,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
+app.include_router(tickets.router)
+app.include_router(locations.router)
 
 
 @app.get("/", tags=["Root"])
