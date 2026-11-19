@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.database import check_db_connection
 from app.api import auth, tickets
+from app.api import auth, tickets, locations
+
+app.include_router(auth.router)
+app.include_router(tickets.router)
+app.include_router(locations.router)
 
 app = FastAPI(
     title=settings.APP_NAME,
