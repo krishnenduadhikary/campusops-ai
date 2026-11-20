@@ -5,6 +5,8 @@ import Login from './pages/auth/Login';
 import StudentDashboard from './pages/student/StudentDashboard';
 import SubmitTicket from './pages/student/SubmitTicket';
 import TicketDetail from './pages/student/TicketDetail';
+import TechnicianDashboard from './pages/technician/TechnicianDashboard';
+import TechnicianTicketDetail from './pages/technician/TechnicianTicketDetail';
 
 function RoleRoute({ children, roles }) {
   const { user } = useAuth();
@@ -44,10 +46,11 @@ function AppRoutes() {
           <div className="p-8 text-2xl font-bold text-blue-600">🏫 Admin Dashboard — Coming Day 11</div>
         </RoleRoute>
       } />
-      <Route path="/technician" element={
-        <RoleRoute roles={['TECHNICIAN', 'ADMIN']}>
-          <div className="p-8 text-2xl font-bold text-green-600">🔧 Technician Dashboard — Coming Day 10</div>
-        </RoleRoute>
+            <Route path="/technician" element={
+        <RoleRoute roles={['TECHNICIAN', 'ADMIN']}><TechnicianDashboard /></RoleRoute>
+      } />
+      <Route path="/technician/tickets/:id" element={
+        <RoleRoute roles={['TECHNICIAN', 'ADMIN']}><TechnicianTicketDetail /></RoleRoute>
       } />
       <Route path="/supervisor" element={
         <RoleRoute roles={['SUPERVISOR', 'ADMIN']}>

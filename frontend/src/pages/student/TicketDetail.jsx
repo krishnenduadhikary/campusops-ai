@@ -5,6 +5,7 @@ import DashboardLayout from '../../layouts/DashboardLayout';
 import StatusBadge from '../../components/common/StatusBadge';
 import PriorityBadge from '../../components/common/PriorityBadge';
 import { ticketService } from '../../services/ticketService';
+import { formatDateTime } from '../../utils/date';
 
 export default function TicketDetail() {
   const { id } = useParams();
@@ -57,8 +58,8 @@ export default function TicketDetail() {
             )}
 
             <div className="mt-6 text-xs text-gray-500 space-y-1">
-              <p>Submitted: {new Date(ticket.created_at).toLocaleString()}</p>
-              {ticket.due_at && <p>Expected by: {new Date(ticket.due_at).toLocaleString()}</p>}
+              <p>Submitted: {formatDateTime(ticket.created_at)}</p>
+              {ticket.due_at && <p>Expected by: {formatDateTime(ticket.due_at)}</p>}
             </div>
           </div>
 
@@ -72,7 +73,7 @@ export default function TicketDetail() {
                   <StatusBadge status={h.new_status} />
                   {h.comment && <p className="text-sm text-gray-600 mt-1">{h.comment}</p>}
                   <p className="text-xs text-gray-400 mt-1">
-                    {new Date(h.timestamp).toLocaleString()}
+                    {formatDateTime(h.timestamp)}
                   </p>
                 </li>
               ))}

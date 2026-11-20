@@ -21,4 +21,16 @@ export const ticketService = {
     const res = await api.get('/locations/');
     return res.data;
   },
+    async accept(id) {
+    const res = await api.post(`/tickets/${id}/accept`);
+    return res.data;
+  },
+  async start(id) {
+    const res = await api.post(`/tickets/${id}/start`);
+    return res.data;
+  },
+  async resolve(id, resolution_notes) {
+    const res = await api.post(`/tickets/${id}/resolve`, { resolution_notes });
+    return res.data;
+  },
 };

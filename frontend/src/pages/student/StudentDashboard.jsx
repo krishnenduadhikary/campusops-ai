@@ -5,6 +5,7 @@ import DashboardLayout from '../../layouts/DashboardLayout';
 import StatusBadge from '../../components/common/StatusBadge';
 import PriorityBadge from '../../components/common/PriorityBadge';
 import { ticketService } from '../../services/ticketService';
+import { parseDate } from '../../utils/date';
 
 const DONE = ['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED'];
 
@@ -67,7 +68,7 @@ export default function StudentDashboard() {
                 <p className="text-xs text-gray-400">{t.ticket_number}</p>
                 <p className="font-medium text-gray-800">{t.title}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {new Date(t.created_at).toLocaleDateString()}
+                  {parseDate(t.created_at)?.toLocaleDateString()}
                 </p>
               </div>
               <div className="flex items-center gap-2">
