@@ -21,6 +21,13 @@ from app.core.dependencies import (
     get_supervisor_or_admin,
 )
 
+FINISHED_STATUSES = [
+    TicketStatus.RESOLVED,
+    TicketStatus.CLOSED,
+    TicketStatus.CANCELLED,
+    TicketStatus.REJECTED,
+]
+
 
 def generate_ticket_number(db: Session) -> str:
     count = db.query(Ticket).count()
@@ -134,9 +141,11 @@ def list_tickets(
             )
         query = query.filter(or_(*conditions))
     elif current_user.role == UserRole.SUPERVISOR:
-        query = query.filter(
-            Ticket.assigned_department == current_user.department_id
-        )
+        # own department's tickets + unassigned tickets waiting for triage
+        conditions = [Ticket.assigned_department.is_(None)]
+        if current_user.department_id:
+            conditions.append(Ticket.assigned_department == current_user.department_id)
+        query = query.filter(or_(*conditions))
     # ADMIN sees all
 
     if status:
@@ -207,19 +216,28 @@ def update_ticket(
     ticket_id: int,
     update_data: TicketUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_supervisor_or_admin)
 ):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    for field, value in update_data.model_dump(exclude_unset=True).items():
+    if current_user.role == UserRole.SUPERVISOR:
+        if ticket.assigned_department not in (None, current_user.department_id):
+            raise HTTPException(status_code=403, detail="This ticket belongs to another department")
+
+    changes = update_data.model_dump(exclude_unset=True)
+    changes.pop("status", None)  # status changes only through the workflow endpoints
+
+    for field, value in changes.items():
         setattr(ticket, field, value)
+
+    if "priority" in changes and ticket.assigned_department:
+        ticket.due_at = calculate_due_date(ticket.priority, ticket.assigned_department, db)
 
     db.commit()
     db.refresh(ticket)
     return ticket
-
 
 # ─── ASSIGN ───────────────────────────────────────
 @router.post("/{ticket_id}/assign", response_model=TicketResponse)
@@ -233,25 +251,53 @@ def assign_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    old_status = ticket.status
-    ticket.assigned_department = assign_data.department_id
-    ticket.assigned_to = assign_data.technician_id
-    ticket.status = TicketStatus.ASSIGNED
-
-    if assign_data.department_id:
-        ticket.due_at = calculate_due_date(
-            ticket.priority, assign_data.department_id, db
+    if ticket.status in FINISHED_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot assign a ticket with status {ticket.status.value}"
         )
 
-    add_history(
-        db, ticket.id, old_status,
-        TicketStatus.ASSIGNED, current_user.id,
-        f"Assigned to department {assign_data.department_id}"
-    )
+    if current_user.role == UserRole.SUPERVISOR:
+        if ticket.assigned_department not in (None, current_user.department_id):
+            raise HTTPException(status_code=403, detail="This ticket belongs to another department")
+
+    department = db.query(Department).filter(Department.id == assign_data.department_id).first()
+    if not department:
+        raise HTTPException(status_code=404, detail="Department not found")
+
+    technician = None
+    if assign_data.technician_id is not None:
+        technician = db.query(User).filter(User.id == assign_data.technician_id).first()
+        if (
+            not technician
+            or technician.role != UserRole.TECHNICIAN
+            or not technician.is_active
+            or technician.department_id != department.id
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Technician must be an active technician of the selected department"
+            )
+
+    old_status = ticket.status
+    department_changed = ticket.assigned_department != department.id
+
+    ticket.assigned_department = department.id
+    ticket.assigned_to = technician.id if technician else None
+    ticket.status = TicketStatus.ASSIGNED
+
+    # a plain reassignment inside the same department keeps the running SLA clock
+    if ticket.due_at is None or department_changed:
+        ticket.due_at = calculate_due_date(ticket.priority, department.id, db)
+
+    comment = f"Assigned to {department.name}"
+    if technician:
+        comment += f" (technician: {technician.name})"
+    add_history(db, ticket.id, old_status, TicketStatus.ASSIGNED, current_user.id, comment)
+
     db.commit()
     db.refresh(ticket)
     return ticket
-
 
 # ─── ACCEPT ───────────────────────────────────────
 @router.post("/{ticket_id}/accept", response_model=TicketResponse)

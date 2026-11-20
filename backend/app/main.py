@@ -2,25 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.database import check_db_connection
-from app.api import auth, tickets
-from app.api import auth, tickets, locations
+from app.api import auth, tickets, locations, users, departments, analytics
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Smart Campus Operations Intelligence Platform",
-    docs_url="/docs",
-    redoc_url="/redoc"
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,6 +20,9 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(tickets.router)
 app.include_router(locations.router)
+app.include_router(users.router)
+app.include_router(departments.router)
+app.include_router(analytics.router)
 
 
 @app.get("/", tags=["Root"])
