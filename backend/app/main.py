@@ -4,10 +4,15 @@ from app.core.config import settings
 from app.db.database import check_db_connection
 from app.api import auth, tickets
 from app.api import auth, tickets, locations
+from app.api import auth, tickets, locations, users, departments, analytics
+
 
 app.include_router(auth.router)
 app.include_router(tickets.router)
 app.include_router(locations.router)
+app.include_router(users.router)
+app.include_router(departments.router)
+app.include_router(analytics.router)
 
 app = FastAPI(
     title=settings.APP_NAME,
