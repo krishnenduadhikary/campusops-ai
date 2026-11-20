@@ -14,6 +14,13 @@ from app.core.dependencies import get_current_user, get_technician_or_above
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
+from sqlalchemy import or_
+from app.core.dependencies import (
+    get_current_user,
+    get_technician_or_above,
+    get_supervisor_or_admin,
+)
+
 
 def generate_ticket_number(db: Session) -> str:
     count = db.query(Ticket).count()
@@ -51,6 +58,21 @@ def add_history(
         comment=comment
     )
     db.add(history)
+
+
+def ensure_can_work(ticket: Ticket, user: User):
+    """A technician may only act on their own ticket, or on an
+    unclaimed ticket assigned to their department."""
+    if user.role != UserRole.TECHNICIAN:
+        return
+    is_mine = ticket.assigned_to == user.id
+    is_open_in_dept = (
+        ticket.assigned_to is None
+        and user.department_id is not None
+        and ticket.assigned_department == user.department_id
+    )
+    if not (is_mine or is_open_in_dept):
+        raise HTTPException(status_code=403, detail="This ticket is not assigned to you")
 
 
 # ─── CREATE ───────────────────────────────────────
@@ -104,7 +126,13 @@ def list_tickets(
     if current_user.role == UserRole.STUDENT:
         query = query.filter(Ticket.reported_by == current_user.id)
     elif current_user.role == UserRole.TECHNICIAN:
-        query = query.filter(Ticket.assigned_to == current_user.id)
+        conditions = [Ticket.assigned_to == current_user.id]
+        if current_user.department_id:
+            conditions.append(
+                (Ticket.assigned_department == current_user.department_id)
+                & (Ticket.assigned_to.is_(None))
+            )
+        query = query.filter(or_(*conditions))
     elif current_user.role == UserRole.SUPERVISOR:
         query = query.filter(
             Ticket.assigned_department == current_user.department_id
@@ -199,7 +227,7 @@ def assign_ticket(
     ticket_id: int,
     assign_data: TicketAssign,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_technician_or_above)
+    current_user: User = Depends(get_supervisor_or_admin)
 ):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
@@ -235,6 +263,7 @@ def accept_ticket(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+        ensure_can_work(ticket, current_user)
 
     if ticket.status != TicketStatus.ASSIGNED:
         raise HTTPException(
@@ -266,6 +295,7 @@ def start_ticket(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+        ensure_can_work(ticket, current_user)
 
     if ticket.status != TicketStatus.ACCEPTED:
         raise HTTPException(
@@ -297,6 +327,7 @@ def resolve_ticket(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+        ensure_can_work(ticket, current_user)
 
     if ticket.status not in [TicketStatus.IN_PROGRESS, TicketStatus.ACCEPTED]:
         raise HTTPException(
