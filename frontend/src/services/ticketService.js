@@ -33,4 +33,8 @@ export const ticketService = {
     const res = await api.post(`/tickets/${id}/resolve`, { resolution_notes });
     return res.data;
   },
+    async assign(id, payload) {
+    const res = await api.post(`/tickets/${id}/assign`, payload);
+    return res.data;
+  },
 };
